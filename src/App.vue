@@ -370,24 +370,29 @@
           </div>
 
           <div class="bg-white/80 backdrop-blur-xl p-10 md:p-14 rounded-[3rem] border border-white shadow-2xl scroll-driven slide-from-left relative">
-            <form class="relative z-10 space-y-8" @submit.prevent>
+            <form class="relative z-10 space-y-8" @submit.prevent="submitForm">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                   <label class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Name</label>
-                  <input type="text" class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-gray-800 placeholder-gray-400 font-medium" placeholder="Ihr Name">
+                  <input type="text" v-model="formName" required class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-gray-800 placeholder-gray-400 font-medium" placeholder="Ihr Name">
                 </div>
                 <div>
                   <label class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">E-Mail</label>
-                  <input type="email" class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-gray-800 placeholder-gray-400 font-medium" placeholder="Ihre E-Mail Adresse">
+                  <input type="email" v-model="formEmail" required class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-gray-800 placeholder-gray-400 font-medium" placeholder="Ihre E-Mail Adresse">
                 </div>
               </div>
               <div>
                 <label class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Nachricht</label>
-                <textarea rows="5" class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-gray-800 placeholder-gray-400 resize-none font-medium" placeholder="Ihre Nachricht..."></textarea>
+                <textarea rows="5" v-model="formMessage" required class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-gray-800 placeholder-gray-400 resize-none font-medium" placeholder="Ihre Nachricht..."></textarea>
               </div>
+              
+              <div v-if="submitMessage" class="text-center font-bold" :class="submitMessage.includes('erfolgreich') ? 'text-green-600' : (submitMessage.includes('Fehler') || submitMessage.includes('Bitte') ? 'text-red-500' : 'text-blue-600')">
+                {{ submitMessage }}
+              </div>
+
               <div class="text-center pt-4">
-                <button type="submit" class="bg-blue-600 text-white font-bold text-lg px-12 py-4 rounded-full shadow-[0_8px_20px_rgba(37,99,235,0.3)] hover:bg-blue-500 hover:-translate-y-1 hover:shadow-[0_12px_25px_rgba(37,99,235,0.4)] transition-all duration-300 w-full md:w-auto">
-                  Nachricht Senden
+                <button type="submit" :disabled="isSubmitting" :class="isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 hover:-translate-y-1 hover:shadow-[0_12px_25px_rgba(37,99,235,0.4)]'" class="text-white font-bold text-lg px-12 py-4 rounded-full shadow-[0_8px_20px_rgba(37,99,235,0.3)] transition-all duration-300 w-full md:w-auto">
+                  {{ isSubmitting ? 'Senden...' : 'Nachricht Senden' }}
                 </button>
               </div>
             </form>
@@ -448,6 +453,58 @@ import bgImg from './assets/portrait.png';
 
 // 导航栏滚动状态变量
 const isScrolled = ref(false);
+
+// ✨ 新增：表单绑定的变量（记事本）
+const formName = ref('');
+const formEmail = ref('');
+const formMessage = ref('');
+const isSubmitting = ref(false);
+const submitMessage = ref('');
+
+// ✨ 新增：处理表单提交的函数
+const submitForm = async () => {
+  if (!formName.value || !formEmail.value || !formMessage.value) {
+    submitMessage.value = 'Bitte füllen Sie alle Felder aus. (请填写所有字段)';
+    return;
+  }
+  
+  isSubmitting.value = true;
+  submitMessage.value = 'Senden... (发送中...)';
+
+  try {
+    // 🔍 重点：前端呼叫我们刚才写的 Serverless 后端接口！
+    const response = await fetch('/.netlify/functions/sendEmail', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: formName.value,
+        email: formEmail.value,
+        message: formMessage.value
+      })
+    });
+
+    // 如果后端报错了（比如网络断了，或者密钥不对）
+    if (!response.ok) {
+      throw new Error('Server antwortet mit Fehler');
+    }
+
+    // 发送成功，清空表单并提示用户
+    submitMessage.value = 'Nachricht erfolgreich gesendet! (发送成功！)';
+    formName.value = '';
+    formEmail.value = '';
+    formMessage.value = '';
+    
+    setTimeout(() => { submitMessage.value = ''; }, 3000);
+
+  } catch (error) {
+    console.error(error);
+    submitMessage.value = 'Fehler beim Senden. Bitte versuche es später noch einmal. (发送失败)';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
 
 const handleContainerScroll = (e) => {
   isScrolled.value = e.target.scrollTop > 60;
